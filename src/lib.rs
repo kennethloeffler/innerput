@@ -26,6 +26,12 @@ pub enum Key {
     Super,
 }
 
-pub trait Keyboard<ErrorType> {
+mod private {
+    pub trait Sealed {}
+
+    impl Sealed for super::Innerput {}
+}
+
+pub trait Keyboard<ErrorType>: private::Sealed {
     fn send_chord(&self, keys: &[Key], process: &process::Child) -> Result<(), ErrorType>;
 }

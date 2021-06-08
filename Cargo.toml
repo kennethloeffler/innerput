@@ -1,9 +1,17 @@
 [package]
 name = "innerput"
-version = "0.0.0"
+description = "Simulate keyboard input on Windows"
 authors = ["Kenneth Loeffler <kenneth.loeffler@outlook.com>"]
+version = "0.0.1"
+homepage = "https://github.com/kennethloeffler/innerput"
+repository = "https://github.com/kennethloeffler/innerput.git"
+documentation = "https://docs.rs/innerput"
+readme = "README.md"
+license = "MIT"
 edition = "2018"
 
 [dependencies]
 thiserror = "1.0.24"
+
+[target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = [ "impl-default", "winuser", "processthreadsapi" ]}

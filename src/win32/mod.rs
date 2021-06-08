@@ -33,6 +33,8 @@ impl Innerput {
 }
 
 impl Keyboard<Error> for Innerput {
+    /// Sends a key chord to the child process. All the keys are pressed before
+    /// being released.
     fn send_chord(&self, keys: &[Key], process: &process::Child) -> Result<(), Error> {
         window::activate_top_level_window(process)?;
 
