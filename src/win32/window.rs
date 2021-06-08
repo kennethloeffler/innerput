@@ -30,7 +30,7 @@ pub enum Error {
     #[error("Failed to activate window")]
     WindowActivationFailed,
 
-    #[error("Target window is hung, cannot set as foreground window")]
+    #[error("Cannot set hung window as foreground window")]
     TargetWindowHung,
 }
 
@@ -60,6 +60,16 @@ impl Window {
     }
 
     pub fn try_set_foreground(&self) -> Result<(), Error> {
+        // Calling SetForegroundWindow on a hung window while AttachThreadInput
+        // is in effect can cause us to hang too.
+        if self.is_hung() {
+            return Err(Error::TargetWindowHung);
+        }
+
+        if self.is_foreground() {
+            return Ok(());
+        }
+
         // Autohotkey source:
         // > Probably best not to trust its return value.  It's been shown to be
         // > unreliable at times.  Example: I've confirmed that
@@ -157,12 +167,6 @@ fn get_top_level_window(process: &process::Child) -> Result<Window, Error> {
 
 pub fn activate_top_level_window(process: &process::Child) -> Result<(), Error> {
     let window = get_top_level_window(process)?;
-
-    // Calling SetForegroundWindow on a hung window while AttachThreadInput
-    // is in effect can cause us to hang too!
-    if window.is_hung() {
-        return Err(Error::TargetWindowHung);
-    }
 
     // The target window is already in the foreground, so nothing more needs
     // to be done.
