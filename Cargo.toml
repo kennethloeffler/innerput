@@ -1,0 +1,8 @@
+[package]
+name = "innerput"
+version = "0.0.0"
+authors = ["Kenneth Loeffler <kenneth.loeffler@outlook.com>"]
+edition = "2018"
+
+[dependencies]
+winapi = { version = "0.3.9", features = ["winuser", "processthreadsapi" ]}
