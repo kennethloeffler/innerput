@@ -59,7 +59,7 @@ impl Window {
         result != FALSE
     }
 
-    pub fn try_set_foreground(&self) -> Result<(), Error> {
+    fn inner_set_foreground(&self) -> Result<(), Error> {
         // Calling SetForegroundWindow on a hung window while AttachThreadInput
         // is in effect can cause us to hang too.
         if self.is_hung() {
@@ -90,6 +90,18 @@ impl Window {
         } else {
             Err(Error::SetForegroundWindowFailed)
         }
+    }
+
+    pub fn try_set_foreground(&self, max_tries: i32) -> Result<(), Error> {
+        for try_count in 1..=max_tries {
+            match self.inner_set_foreground() {
+                Ok(()) => return Ok(()),
+                Err(err) if try_count == max_tries => return Err(err),
+                Err(_) => continue,
+            }
+        }
+
+        Ok(())
     }
 
     pub fn is_foreground(&self) -> bool {
@@ -190,15 +202,7 @@ pub fn activate_top_level_window(process: &process::Child) -> Result<(), Error> 
     // The AutoHotkey source mentions that this "never seems to take more
     // than two tries" and that "the number of tries needed might vary
     // depending on how fast the CPU is." I don't know...
-    for i in 0..5 {
-        if let Ok(()) = window.try_set_foreground() {
-            break;
-        } else if i != 5 {
-            continue;
-        } else {
-            return Err(Error::SetForegroundWindowFailed);
-        };
-    }
+    window.try_set_foreground(5)?;
 
     if did_attach_current_to_foreground {
         unsafe { AttachThreadInput(current_thread, foreground_thread, FALSE) };
