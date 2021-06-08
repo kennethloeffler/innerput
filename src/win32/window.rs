@@ -54,10 +54,9 @@ impl Window {
 
         let new_foreground_window = get_foreground_window();
 
-        if new_foreground_window == *self {
-            Some(())
-        } else if new_foreground_window != *current_foreground_window
-            && self.hwnd == unsafe { GetWindow(new_foreground_window.hwnd, GW_OWNER) }
+        if new_foreground_window == *self
+            || new_foreground_window != *current_foreground_window
+                && self.hwnd == unsafe { GetWindow(new_foreground_window.hwnd, GW_OWNER) }
         {
             Some(())
         } else {
@@ -109,7 +108,7 @@ fn get_foreground_window() -> Window {
     let mut foreground_hwnd = unsafe { GetForegroundWindow() };
 
     // The taskbar is focused if the foreground window is null.
-    if foreground_hwnd == ptr::null_mut() {
+    if foreground_hwnd.is_null() {
         foreground_hwnd = unsafe {
             let window_name = CString::new("Shell_TrayWnd").unwrap();
             FindWindowA(window_name.as_ptr(), ptr::null_mut())
