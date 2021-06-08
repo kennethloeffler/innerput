@@ -39,7 +39,7 @@ impl Window {
 
     pub fn is_visible(&self) -> bool {
         let result = unsafe { IsWindowVisible(self.hwnd) };
-        result != 0
+        result != FALSE
     }
 
     pub fn try_set_foreground(&self) -> Option<()> {
@@ -71,12 +71,12 @@ impl Window {
 
     pub fn is_minimized(&self) -> bool {
         let result = unsafe { IsIconic(self.hwnd) };
-        result != 0
+        result != FALSE
     }
 
     pub fn is_hung(&self) -> bool {
         let result = unsafe { IsHungAppWindow(self.hwnd) };
-        result != 0
+        result != FALSE
     }
 
     pub fn restore_if_minimized(&self) {
