@@ -42,20 +42,20 @@ impl Window {
         result != 0
     }
 
-    pub fn try_set_foreground(&self, current_foreground_window: &Window) -> Option<()> {
+    pub fn try_set_foreground(&self) -> Option<()> {
         // Autohotkey source:
         // > Probably best not to trust its return value.  It's been shown to be
         // > unreliable at times.  Example: I've confirmed that
         // > SetForegroundWindow() sometimes (perhaps about 10% of the time)
         // > indicates failure even though it succeeds.
         unsafe { SetForegroundWindow(self.hwnd) };
-
         std::thread::sleep(Duration::from_millis(SLEEP_DURATION));
 
+        let previous_foreground_window = get_foreground_window();
         let new_foreground_window = get_foreground_window();
 
         if new_foreground_window == *self
-            || new_foreground_window != *current_foreground_window
+            || new_foreground_window != previous_foreground_window
                 && self.hwnd == unsafe { GetWindow(new_foreground_window.hwnd, GW_OWNER) }
         {
             Some(())
@@ -168,7 +168,7 @@ pub fn activate_top_level_window(process: &process::Child) -> Option<()> {
         // than two tries" and that "the number of tries needed might vary
         // depending on how fast the CPU is." I don't know...
         for _ in 0..5 {
-            if let Some(()) = window.try_set_foreground(&foreground_window) {
+            if let Some(()) = window.try_set_foreground() {
                 break;
             } else {
                 continue;
