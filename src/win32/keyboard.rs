@@ -67,7 +67,7 @@ fn get_keycode(key: &Key) -> WORD {
     }
 }
 
-pub(crate) fn make_keybdinput(keys: &[Key], flags: DWORD) -> Vec<INPUT> {
+pub(crate) fn make_input(keys: &[Key], flags: DWORD) -> Vec<INPUT> {
     keys.iter()
         .map(|key| {
             let mut input = INPUT_u::default();
