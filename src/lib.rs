@@ -26,6 +26,6 @@ pub enum Key {
     Super,
 }
 
-pub trait Keyboard {
-    fn send_chord(&self, keys: &[Key], process: &process::Child) -> Option<()>;
+pub trait Keyboard<ErrorType> {
+    fn send_chord(&self, keys: &[Key], process: &process::Child) -> Result<(), ErrorType>;
 }

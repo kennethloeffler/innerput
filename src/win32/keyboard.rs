@@ -1,5 +1,7 @@
 use std::mem::size_of;
 
+use thiserror::Error;
+
 use winapi::{
     ctypes::c_int,
     shared::minwindef::{DWORD, WORD},
@@ -7,6 +9,12 @@ use winapi::{
 };
 
 use crate::Key;
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("Failed to convert character '{0}' to keycode")]
+    CharConversionFailed(char),
+}
 
 // https://web.archive.org/web/20210404165500/https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
 const VK_RETURN: u16 = 0x0D;
@@ -27,49 +35,46 @@ const VK_UP: u16 = 0x26;
 const VK_DOWN: u16 = 0x28;
 const VK_DELETE: u16 = 0x2E;
 
-fn keycode_from_char(string: String) -> WORD {
+fn keycode_from_char(string: String) -> Result<WORD, Error> {
     let buf = &mut [0u8; 2];
-    let result = string
-        .chars()
-        .next()
-        .expect("Invalid character passed as input")
+    let character = string.chars().next();
+
+    let byte = character
+        .ok_or_else(|| Error::CharConversionFailed(character.unwrap_or_default()))?
         .encode_utf8(buf)
         .bytes()
-        .next();
+        .next()
+        .ok_or_else(|| Error::CharConversionFailed(character.unwrap_or_default()))?;
 
-    if result.is_none() {
-        panic!("Invalid character passed as input");
-    }
-
-    (unsafe { VkKeyScanA(result.unwrap() as i8) }) as WORD
+    Ok((unsafe { VkKeyScanA(byte as i8) }) as WORD)
 }
 
-fn get_keycode(key: &Key) -> WORD {
+fn get_keycode(key: &Key) -> Result<WORD, Error> {
     match key {
-        Key::Alt => VK_MENU,
-        Key::Backspace => VK_BACK,
-        Key::CapsLock => VK_CAPITAL,
+        Key::Alt => Ok(VK_MENU),
+        Key::Backspace => Ok(VK_BACK),
+        Key::CapsLock => Ok(VK_CAPITAL),
         Key::Char(character) => keycode_from_char(character.to_string()),
-        Key::Control => VK_CONTROL,
-        Key::Delete => VK_DELETE,
-        Key::Down => VK_DOWN,
-        Key::End => VK_END,
-        Key::Esc => VK_ESCAPE,
-        Key::Home => VK_HOME,
-        Key::Left => VK_LEFT,
-        Key::Enter => VK_RETURN,
-        Key::Right => VK_RIGHT,
-        Key::Shift => VK_SHIFT,
-        Key::Space => VK_SPACE,
-        Key::Super => VK_LWIN,
-        Key::Tab => VK_TAB,
-        Key::Up => VK_UP,
+        Key::Control => Ok(VK_CONTROL),
+        Key::Delete => Ok(VK_DELETE),
+        Key::Down => Ok(VK_DOWN),
+        Key::End => Ok(VK_END),
+        Key::Esc => Ok(VK_ESCAPE),
+        Key::Home => Ok(VK_HOME),
+        Key::Left => Ok(VK_LEFT),
+        Key::Enter => Ok(VK_RETURN),
+        Key::Right => Ok(VK_RIGHT),
+        Key::Shift => Ok(VK_SHIFT),
+        Key::Space => Ok(VK_SPACE),
+        Key::Super => Ok(VK_LWIN),
+        Key::Tab => Ok(VK_TAB),
+        Key::Up => Ok(VK_UP),
     }
 }
 
-pub(crate) fn make_input(keys: &[Key], flags: DWORD) -> Vec<INPUT> {
+pub(crate) fn make_input(keys: &[Key], flags: DWORD) -> Result<Vec<INPUT>, Error> {
     keys.iter()
-        .map(|key| {
+        .map(|key| -> Result<INPUT, Error> {
             let mut input = INPUT_u::default();
 
             unsafe {
@@ -78,14 +83,14 @@ pub(crate) fn make_input(keys: &[Key], flags: DWORD) -> Vec<INPUT> {
                     dwFlags: flags,
                     time: 0,
                     wScan: 0,
-                    wVk: get_keycode(key),
+                    wVk: get_keycode(key)?,
                 };
             };
 
-            INPUT {
+            Ok(INPUT {
                 type_: INPUT_KEYBOARD,
                 u: input,
-            }
+            })
         })
         .collect()
 }
@@ -106,7 +111,7 @@ mod test {
 
     #[test]
     fn char_to_keycode() {
-        assert_eq!(get_keycode(&Key::Char('s')), 0x53);
-        assert_eq!(get_keycode(&Key::Char('1')), 0x31);
+        assert_eq!(get_keycode(&Key::Char('s')).unwrap(), 0x53);
+        assert_eq!(get_keycode(&Key::Char('1')).unwrap(), 0x31);
     }
 }

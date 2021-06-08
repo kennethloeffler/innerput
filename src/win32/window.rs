@@ -1,5 +1,7 @@
 use std::{ffi::CString, process, ptr, time::Duration};
 
+use thiserror::Error;
+
 use winapi::{
     shared::{
         minwindef::{BOOL, DWORD, FALSE, LPARAM, TRUE},
@@ -17,7 +19,22 @@ use winapi::{
 
 const SLEEP_DURATION: u64 = 10;
 
-#[derive(Eq, PartialEq)]
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("Failed to set foreground window")]
+    SetForegroundWindowFailed,
+
+    #[error("Failed to locate a top-level window for process {0:X}")]
+    FindTopLevelWindowFailed(u32),
+
+    #[error("Failed to activate window")]
+    WindowActivationFailed,
+
+    #[error("Target window is hung, cannot set as foreground window")]
+    TargetWindowHung,
+}
+
+#[derive(Debug, Eq, PartialEq)]
 struct Window {
     hwnd: HWND,
 }
@@ -42,7 +59,7 @@ impl Window {
         result != FALSE
     }
 
-    pub fn try_set_foreground(&self) -> Option<()> {
+    pub fn try_set_foreground(&self) -> Result<(), Error> {
         // Autohotkey source:
         // > Probably best not to trust its return value.  It's been shown to be
         // > unreliable at times.  Example: I've confirmed that
@@ -58,9 +75,9 @@ impl Window {
             || new_foreground_window != previous_foreground_window
                 && self.hwnd == unsafe { GetWindow(new_foreground_window.hwnd, GW_OWNER) }
         {
-            Some(())
+            Ok(())
         } else {
-            None
+            Err(Error::SetForegroundWindowFailed)
         }
     }
 
@@ -118,7 +135,7 @@ fn get_foreground_window() -> Window {
     unsafe { Window::from_raw_handle(foreground_hwnd) }
 }
 
-fn get_top_level_window(process: &process::Child) -> Option<Window> {
+fn get_top_level_window(process: &process::Child) -> Result<Window, Error> {
     let mut result_hwnd = ptr::null_mut();
 
     enum_windows(|window| {
@@ -131,65 +148,63 @@ fn get_top_level_window(process: &process::Child) -> Option<Window> {
     });
 
     if !result_hwnd.is_null() {
-        Some(unsafe { Window::from_raw_handle(result_hwnd) })
+        Ok(unsafe { Window::from_raw_handle(result_hwnd) })
     } else {
-        None
+        Err(Error::FindTopLevelWindowFailed(process.id()))
     }
 }
 
-pub fn activate_top_level_window(process: &process::Child) -> Option<()> {
-    if let Some(window) = get_top_level_window(process) {
-        // Calling SetForegroundWindow on a hung window while AttachThreadInput
-        // is in effect can cause us to hang too!
-        if window.is_hung() {
-            return None;
-        }
+pub fn activate_top_level_window(process: &process::Child) -> Result<(), Error> {
+    let window = get_top_level_window(process)?;
 
-        // The target window is already in the foreground, so nothing more needs
-        // to be done.
-        if window.is_foreground() {
-            return Some(());
-        }
-
-        let foreground_window = get_foreground_window();
-        let foreground_thread = foreground_window.thread_id();
-        let target_thread = window.thread_id();
-        let current_thread = unsafe { GetCurrentThreadId() };
-
-        window.restore_if_minimized();
-
-        let did_attach_current_to_foreground = !foreground_window.is_hung()
-            && unsafe { AttachThreadInput(current_thread, foreground_thread, TRUE) } != FALSE;
-
-        let did_attach_foreground_to_target =
-            unsafe { AttachThreadInput(foreground_thread, target_thread, TRUE) } != FALSE;
-
-        // The AutoHotkey source mentions that this "never seems to take more
-        // than two tries" and that "the number of tries needed might vary
-        // depending on how fast the CPU is." I don't know...
-        for _ in 0..5 {
-            if let Some(()) = window.try_set_foreground() {
-                break;
-            } else {
-                continue;
-            };
-        }
-
-        if did_attach_current_to_foreground {
-            unsafe { AttachThreadInput(current_thread, foreground_thread, FALSE) };
-        };
-
-        if did_attach_foreground_to_target {
-            unsafe { AttachThreadInput(foreground_thread, target_thread, FALSE) };
-        };
-
-        // If we don't set this back then the z-order gets messed up and an
-        // unexpected window will pop to the foreground when the target window
-        // closes.
-        foreground_window.try_set_foreground();
-
-        Some(())
-    } else {
-        None
+    // Calling SetForegroundWindow on a hung window while AttachThreadInput
+    // is in effect can cause us to hang too!
+    if window.is_hung() {
+        return Err(Error::TargetWindowHung);
     }
+
+    // The target window is already in the foreground, so nothing more needs
+    // to be done.
+    if window.is_foreground() {
+        return Ok(());
+    }
+
+    let foreground_window = get_foreground_window();
+    let foreground_thread = foreground_window.thread_id();
+    let target_thread = window.thread_id();
+    let current_thread = unsafe { GetCurrentThreadId() };
+
+    window.restore_if_minimized();
+
+    let did_attach_current_to_foreground = !foreground_window.is_hung()
+        && unsafe { AttachThreadInput(current_thread, foreground_thread, TRUE) } != FALSE;
+
+    let did_attach_foreground_to_target =
+        unsafe { AttachThreadInput(foreground_thread, target_thread, TRUE) } != FALSE;
+
+    // The AutoHotkey source mentions that this "never seems to take more
+    // than two tries" and that "the number of tries needed might vary
+    // depending on how fast the CPU is." I don't know...
+    for i in 0..5 {
+        if let Ok(()) = window.try_set_foreground() {
+            break;
+        } else if i != 5 {
+            continue;
+        } else {
+            return Err(Error::SetForegroundWindowFailed);
+        };
+    }
+
+    if did_attach_current_to_foreground {
+        unsafe { AttachThreadInput(current_thread, foreground_thread, FALSE) };
+    };
+
+    if did_attach_foreground_to_target {
+        unsafe { AttachThreadInput(foreground_thread, target_thread, FALSE) };
+    };
+
+    // If we don't set this back then the z-order gets messed up and an
+    // unexpected window will pop to the foreground when the target window
+    // closes.
+    foreground_window.try_set_foreground()
 }
