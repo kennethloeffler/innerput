@@ -183,6 +183,11 @@ pub fn activate_top_level_window(process: &process::Child) -> Option<()> {
             unsafe { AttachThreadInput(foreground_thread, target_thread, FALSE) };
         };
 
+        // If we don't set this back then the z-order gets messed up and an
+        // unexpected window will pop to the foreground when the target window
+        // closes.
+        foreground_window.try_set_foreground();
+
         Some(())
     } else {
         None
