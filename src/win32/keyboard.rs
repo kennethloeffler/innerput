@@ -106,6 +106,7 @@ mod test {
 
     #[test]
     fn char_to_keycode() {
-        assert_eq!(get_keycode(&Key::Char('s')), 0x53)
+        assert_eq!(get_keycode(&Key::Char('s')), 0x53);
+        assert_eq!(get_keycode(&Key::Char('1')), 0x31);
     }
 }
