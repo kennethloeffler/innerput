@@ -16,15 +16,13 @@ pub enum Key {
     Esc,
     Home,
     Left,
-    Char(char),
-    Meta,
     Enter,
     Right,
     Shift,
     Space,
     Tab,
     Up,
-    Code(u16),
+    Char(char),
     Super,
 }
 
