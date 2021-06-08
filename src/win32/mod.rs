@@ -7,17 +7,12 @@ use winapi::um::winuser::KEYEVENTF_KEYUP;
 
 use crate::{Key, Keyboard};
 
+#[derive(Default)]
 pub struct Innerput;
 
 impl Innerput {
     pub fn new() -> Self {
         Innerput {}
-    }
-}
-
-impl Default for Innerput {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
