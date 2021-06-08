@@ -18,7 +18,7 @@ const VK_LWIN: u16 = 0x5b;
 const VK_SHIFT: u16 = 0x10;
 const VK_CAPITAL: u16 = 0x14;
 const VK_MENU: u16 = 0x12;
-const VK_LCONTROL: u16 = 0x11;
+const VK_CONTROL: u16 = 0x11;
 const VK_HOME: u16 = 0x24;
 const VK_END: u16 = 0x23;
 const VK_LEFT: u16 = 0x25;
@@ -50,7 +50,7 @@ fn get_keycode(key: &Key) -> WORD {
         Key::Backspace => VK_BACK,
         Key::CapsLock => VK_CAPITAL,
         Key::Char(character) => keycode_from_char(character.to_string()),
-        Key::Control => VK_LCONTROL,
+        Key::Control => VK_CONTROL,
         Key::Delete => VK_DELETE,
         Key::Down => VK_DOWN,
         Key::End => VK_END,
