@@ -65,10 +65,11 @@ impl Window {
         // > unreliable at times.  Example: I've confirmed that
         // > SetForegroundWindow() sometimes (perhaps about 10% of the time)
         // > indicates failure even though it succeeds.
+        let previous_foreground_window = get_foreground_window();
+
         unsafe { SetForegroundWindow(self.hwnd) };
         std::thread::sleep(Duration::from_millis(SLEEP_DURATION));
 
-        let previous_foreground_window = get_foreground_window();
         let new_foreground_window = get_foreground_window();
 
         if new_foreground_window == *self
