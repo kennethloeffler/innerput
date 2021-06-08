@@ -5,7 +5,7 @@ use thiserror::Error;
 use winapi::{
     ctypes::c_int,
     shared::minwindef::{DWORD, WORD},
-    um::winuser::{INPUT_u, SendInput, VkKeyScanA, INPUT, INPUT_KEYBOARD, KEYBDINPUT},
+    um::winuser::{INPUT_u, SendInput, VkKeyScanW, INPUT, INPUT_KEYBOARD, KEYBDINPUT},
 };
 
 use crate::Key;
@@ -13,7 +13,7 @@ use crate::Key;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Failed to convert character '{0}' to keycode")]
-    CharConversionFailed(char),
+    CharConversionFailed(String),
 }
 
 // https://web.archive.org/web/20210404165500/https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
@@ -35,18 +35,22 @@ const VK_UP: u16 = 0x26;
 const VK_DOWN: u16 = 0x28;
 const VK_DELETE: u16 = 0x2E;
 
-fn keycode_from_char(string: String) -> Result<WORD, Error> {
-    let buf = &mut [0u8; 2];
-    let character = string.chars().next();
+fn keycode_from_char(char_as_string: String) -> Result<WORD, Error> {
+    let buf = &mut [0; 2];
 
-    let byte = character
-        .ok_or_else(|| Error::CharConversionFailed(character.unwrap_or_default()))?
-        .encode_utf8(buf)
-        .bytes()
+    let character = char_as_string
+        .chars()
         .next()
-        .ok_or_else(|| Error::CharConversionFailed(character.unwrap_or_default()))?;
+        .ok_or_else(|| Error::CharConversionFailed(char_as_string.to_string()))?
+        .encode_utf16(buf);
 
-    Ok((unsafe { VkKeyScanA(byte as i8) }) as WORD)
+    if character.len() != 1 {
+        return Err(Error::CharConversionFailed(char_as_string.to_string()));
+    }
+
+    // MSDN: The low order byte is the virtual keycode, while the high order
+    // byte is the shift state.
+    Ok((unsafe { VkKeyScanW(character[0]) }.to_le_bytes()[0]) as WORD)
 }
 
 fn get_keycode(key: &Key) -> Result<WORD, Error> {
