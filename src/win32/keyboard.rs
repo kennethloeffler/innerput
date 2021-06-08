@@ -8,7 +8,7 @@ use winapi::{
 
 use crate::Key;
 
-// https://msdn.microsoft.com/en-us/library/windows/desktop/dd375731
+// https://web.archive.org/web/20210404165500/https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
 const VK_RETURN: u16 = 0x0D;
 const VK_TAB: u16 = 0x09;
 const VK_SPACE: u16 = 0x20;
