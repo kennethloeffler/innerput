@@ -93,35 +93,24 @@ impl Window {
     }
 
     pub fn try_set_foreground(&self, max_tries: i32) -> Result<(), Error> {
-        let foreground_window = get_foreground_window();
-        let foreground_thread = foreground_window.thread_id();
-        let target_thread = self.thread_id();
-        let current_thread = unsafe { GetCurrentThreadId() };
-
-        let did_attach_current_to_foreground = !foreground_window.is_hung()
-            && unsafe { AttachThreadInput(current_thread, foreground_thread, TRUE) } != FALSE;
-
-        let did_attach_foreground_to_target =
-            unsafe { AttachThreadInput(foreground_thread, target_thread, TRUE) } != FALSE;
+        let detach = attach_foreground(self.thread_id());
 
         // The AutoHotkey source mentions that this "never seems to take more
         // than two tries" and that "the number of tries needed might vary
         // depending on how fast the CPU is." I don't know...
         for try_count in 1..=max_tries {
             match self.inner_set_foreground() {
-                Ok(()) => return Ok(()),
-                Err(err) if try_count == max_tries => return Err(err),
+                Ok(()) => {
+                    detach();
+                    return Ok(());
+                }
+                Err(err) if try_count == max_tries => {
+                    detach();
+                    return Err(err);
+                }
                 Err(_) => continue,
             }
         }
-
-        if did_attach_current_to_foreground {
-            unsafe { AttachThreadInput(current_thread, foreground_thread, FALSE) };
-        };
-
-        if did_attach_foreground_to_target {
-            unsafe { AttachThreadInput(foreground_thread, target_thread, FALSE) };
-        };
 
         Ok(())
     }
@@ -164,6 +153,28 @@ where
     let lparam = func_ptr as LPARAM;
 
     unsafe { EnumWindows(Some(callback::<F>), lparam) };
+}
+
+fn attach_foreground(target_thread: u32) -> impl FnOnce() {
+    let foreground_window = get_foreground_window();
+    let foreground_thread = foreground_window.thread_id();
+    let current_thread = unsafe { GetCurrentThreadId() };
+
+    let did_attach_current_to_foreground = !foreground_window.is_hung()
+        && unsafe { AttachThreadInput(current_thread, foreground_thread, TRUE) } != FALSE;
+
+    let did_attach_foreground_to_target =
+        unsafe { AttachThreadInput(foreground_thread, target_thread, TRUE) } != FALSE;
+
+    move || {
+        if did_attach_current_to_foreground {
+            unsafe { AttachThreadInput(current_thread, foreground_thread, FALSE) };
+        };
+
+        if did_attach_foreground_to_target {
+            unsafe { AttachThreadInput(foreground_thread, target_thread, FALSE) };
+        };
+    }
 }
 
 fn get_foreground_window() -> Window {
