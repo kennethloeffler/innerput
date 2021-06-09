@@ -45,7 +45,7 @@ fn keycode_from_char(char_as_string: String) -> Result<WORD, Error> {
         .encode_utf16(buf);
 
     if character.len() != 1 {
-        return Err(Error::CharConversionFailed(char_as_string.to_string()));
+        return Err(Error::CharConversionFailed(char_as_string));
     }
 
     // MSDN: The low order byte is the virtual keycode, while the high order
