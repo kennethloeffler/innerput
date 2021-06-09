@@ -2,7 +2,7 @@
 name = "innerput"
 description = "Simulate keyboard input on Windows"
 authors = ["Kenneth Loeffler <kenneth.loeffler@outlook.com>"]
-version = "0.0.1"
+version = "0.0.2"
 homepage = "https://github.com/kennethloeffler/innerput"
 repository = "https://github.com/kennethloeffler/innerput.git"
 documentation = "https://docs.rs/innerput"
