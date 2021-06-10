@@ -54,26 +54,26 @@ fn keycode_from_char(char_as_string: String) -> Result<WORD, Error> {
 }
 
 fn get_keycode(key: &Key) -> Result<WORD, Error> {
-    match key {
-        Key::Alt => Ok(VK_MENU),
-        Key::Backspace => Ok(VK_BACK),
-        Key::CapsLock => Ok(VK_CAPITAL),
-        Key::Char(character) => keycode_from_char(character.to_string()),
-        Key::Control => Ok(VK_CONTROL),
-        Key::Delete => Ok(VK_DELETE),
-        Key::Down => Ok(VK_DOWN),
-        Key::End => Ok(VK_END),
-        Key::Esc => Ok(VK_ESCAPE),
-        Key::Home => Ok(VK_HOME),
-        Key::Left => Ok(VK_LEFT),
-        Key::Enter => Ok(VK_RETURN),
-        Key::Right => Ok(VK_RIGHT),
-        Key::Shift => Ok(VK_SHIFT),
-        Key::Space => Ok(VK_SPACE),
-        Key::Super => Ok(VK_LWIN),
-        Key::Tab => Ok(VK_TAB),
-        Key::Up => Ok(VK_UP),
-    }
+    Ok(match key {
+        Key::Alt => VK_MENU,
+        Key::Backspace => VK_BACK,
+        Key::CapsLock => VK_CAPITAL,
+        Key::Char(character) => keycode_from_char(character.to_string())?,
+        Key::Control => VK_CONTROL,
+        Key::Delete => VK_DELETE,
+        Key::Down => VK_DOWN,
+        Key::End => VK_END,
+        Key::Esc => VK_ESCAPE,
+        Key::Home => VK_HOME,
+        Key::Left => VK_LEFT,
+        Key::Enter => VK_RETURN,
+        Key::Right => VK_RIGHT,
+        Key::Shift => VK_SHIFT,
+        Key::Space => VK_SPACE,
+        Key::Super => VK_LWIN,
+        Key::Tab => VK_TAB,
+        Key::Up => VK_UP,
+    })
 }
 
 pub(crate) fn make_input(keys: &[Key], flags: DWORD) -> Result<Vec<INPUT>, Error> {
