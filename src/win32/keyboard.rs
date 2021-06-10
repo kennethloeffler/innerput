@@ -99,7 +99,7 @@ pub(crate) fn make_input(keys: &[Key], flags: DWORD) -> Result<Vec<INPUT>, Error
         .collect()
 }
 
-pub(crate) fn send_input(input: &mut Vec<INPUT>) {
+pub(crate) fn send_input(input: &mut [INPUT]) {
     unsafe {
         SendInput(
             input.len() as DWORD,
