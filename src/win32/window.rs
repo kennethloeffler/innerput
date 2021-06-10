@@ -36,27 +36,26 @@ pub enum Error {
 
 #[derive(Debug, Eq, PartialEq)]
 struct Window {
-    hwnd: HWND,
+    handle: HWND,
 }
 
 impl Window {
-    pub unsafe fn from_raw_handle(hwnd: HWND) -> Self {
-        Self { hwnd }
+    pub unsafe fn from_raw_handle(handle: HWND) -> Self {
+        Self { handle }
     }
 
     pub fn process_id(&self) -> DWORD {
         let mut process_id: DWORD = 0;
-        unsafe { GetWindowThreadProcessId(self.hwnd, &mut process_id as *mut _) };
+        unsafe { GetWindowThreadProcessId(self.handle, &mut process_id as *mut _) };
         process_id
     }
 
     pub fn thread_id(&self) -> DWORD {
-        unsafe { GetWindowThreadProcessId(self.hwnd, ptr::null_mut()) }
+        unsafe { GetWindowThreadProcessId(self.handle, ptr::null_mut()) }
     }
 
     pub fn is_visible(&self) -> bool {
-        let result = unsafe { IsWindowVisible(self.hwnd) };
-        result != FALSE
+        (unsafe { IsWindowVisible(self.handle) }) != FALSE
     }
 
     fn inner_set_foreground(&self) -> Result<(), Error> {
@@ -77,14 +76,14 @@ impl Window {
         // > indicates failure even though it succeeds.
         let previous_foreground_window = get_foreground_window()?;
 
-        unsafe { SetForegroundWindow(self.hwnd) };
+        unsafe { SetForegroundWindow(self.handle) };
         std::thread::sleep(Duration::from_millis(SLEEP_DURATION));
 
         let new_foreground_window = get_foreground_window()?;
 
         if new_foreground_window == *self
             || new_foreground_window != previous_foreground_window
-                && self.hwnd == unsafe { GetWindow(new_foreground_window.hwnd, GW_OWNER) }
+                && self.handle == unsafe { GetWindow(new_foreground_window.handle, GW_OWNER) }
         {
             Ok(())
         } else {
@@ -121,18 +120,16 @@ impl Window {
     }
 
     pub fn is_minimized(&self) -> bool {
-        let result = unsafe { IsIconic(self.hwnd) };
-        result != FALSE
+        (unsafe { IsIconic(self.handle) }) != FALSE
     }
 
     pub fn is_hung(&self) -> bool {
-        let result = unsafe { IsHungAppWindow(self.hwnd) };
-        result != FALSE
+        (unsafe { IsHungAppWindow(self.handle) }) != FALSE
     }
 
     pub fn restore_if_minimized(&self) {
         if self.is_minimized() {
-            unsafe { ShowWindow(self.hwnd, SW_RESTORE) };
+            unsafe { ShowWindow(self.handle, SW_RESTORE) };
         }
     }
 }
@@ -200,7 +197,7 @@ fn get_top_level_window(process: &process::Child) -> Result<Window, Error> {
 
     enum_windows(|window| {
         if window.process_id() == process.id() && window.is_visible() {
-            result_hwnd = window.hwnd;
+            result_hwnd = window.handle;
             false
         } else {
             true
