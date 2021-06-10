@@ -27,8 +27,8 @@ pub enum Error {
     #[error("Failed to locate a top-level window for process {0:X}")]
     FindTopLevelWindowFailed(u32),
 
-    #[error("Failed to activate window")]
-    WindowActivationFailed,
+    #[error("Failed to find the foreground window")]
+    NoForegroundWindow,
 
     #[error("Cannot set hung window as foreground window")]
     TargetWindowHung,
@@ -66,7 +66,7 @@ impl Window {
             return Err(Error::TargetWindowHung);
         }
 
-        if self.is_foreground() {
+        if self.is_foreground()? {
             return Ok(());
         }
 
@@ -75,12 +75,12 @@ impl Window {
         // > unreliable at times.  Example: I've confirmed that
         // > SetForegroundWindow() sometimes (perhaps about 10% of the time)
         // > indicates failure even though it succeeds.
-        let previous_foreground_window = get_foreground_window();
+        let previous_foreground_window = get_foreground_window()?;
 
         unsafe { SetForegroundWindow(self.hwnd) };
         std::thread::sleep(Duration::from_millis(SLEEP_DURATION));
 
-        let new_foreground_window = get_foreground_window();
+        let new_foreground_window = get_foreground_window()?;
 
         if new_foreground_window == *self
             || new_foreground_window != previous_foreground_window
@@ -93,7 +93,7 @@ impl Window {
     }
 
     pub fn try_set_foreground(&self, max_tries: i32) -> Result<(), Error> {
-        let detach = attach_foreground(self.thread_id());
+        let detach = attach_foreground(self.thread_id())?;
 
         // The AutoHotkey source mentions that this "never seems to take more
         // than two tries" and that "the number of tries needed might vary
@@ -115,9 +115,9 @@ impl Window {
         Ok(())
     }
 
-    pub fn is_foreground(&self) -> bool {
-        let foreground = unsafe { GetForegroundWindow() };
-        foreground == self.hwnd
+    pub fn is_foreground(&self) -> Result<bool, Error> {
+        let foreground = get_foreground_window()?;
+        Ok(foreground == *self)
     }
 
     pub fn is_minimized(&self) -> bool {
@@ -155,8 +155,8 @@ where
     unsafe { EnumWindows(Some(callback::<F>), lparam) };
 }
 
-fn attach_foreground(target_thread: u32) -> impl FnOnce() {
-    let foreground_window = get_foreground_window();
+fn attach_foreground(target_thread: u32) -> Result<impl FnOnce(), Error> {
+    let foreground_window = get_foreground_window()?;
     let foreground_thread = foreground_window.thread_id();
     let current_thread = unsafe { GetCurrentThreadId() };
 
@@ -166,7 +166,7 @@ fn attach_foreground(target_thread: u32) -> impl FnOnce() {
     let did_attach_foreground_to_target =
         unsafe { AttachThreadInput(foreground_thread, target_thread, TRUE) } != FALSE;
 
-    move || {
+    Ok(move || {
         if did_attach_current_to_foreground {
             unsafe { AttachThreadInput(current_thread, foreground_thread, FALSE) };
         };
@@ -174,21 +174,25 @@ fn attach_foreground(target_thread: u32) -> impl FnOnce() {
         if did_attach_foreground_to_target {
             unsafe { AttachThreadInput(foreground_thread, target_thread, FALSE) };
         };
-    }
+    })
 }
 
-fn get_foreground_window() -> Window {
+fn get_foreground_window() -> Result<Window, Error> {
     let mut foreground_hwnd = unsafe { GetForegroundWindow() };
 
-    // The taskbar is focused if the foreground window is null.
+    // The taskbar might be focused if the foreground window is null?
     if foreground_hwnd.is_null() {
-        foreground_hwnd = unsafe {
-            let window_name = CString::new("Shell_TrayWnd").unwrap();
-            FindWindowA(window_name.as_ptr(), ptr::null_mut())
+        let window_name = CString::new("Shell_TrayWnd").unwrap();
+        let maybe_taskbar_window = unsafe { FindWindowA(window_name.as_ptr(), ptr::null_mut()) };
+
+        if maybe_taskbar_window.is_null() {
+            return Err(Error::NoForegroundWindow);
+        } else {
+            foreground_hwnd = maybe_taskbar_window
         }
     }
 
-    unsafe { Window::from_raw_handle(foreground_hwnd) }
+    Ok(unsafe { Window::from_raw_handle(foreground_hwnd) })
 }
 
 fn get_top_level_window(process: &process::Child) -> Result<Window, Error> {
@@ -215,7 +219,7 @@ pub fn activate_top_level_window(process: &process::Child) -> Result<(), Error> 
 
     // The target window is already in the foreground, so nothing more needs
     // to be done.
-    if window.is_foreground() {
+    if window.is_foreground()? {
         return Ok(());
     }
 
